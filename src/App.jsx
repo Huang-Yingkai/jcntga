@@ -2,6 +2,8 @@ import { Link, Navigate, Route, Routes } from 'react-router-dom';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Profile from './pages/Profile';
+import Renew from './pages/Renew';
+import AdminDashboard from './pages/AdminDashboard';
 
 function DashboardPreview() {
   return (
@@ -39,8 +41,9 @@ export default function App() {
       <Route path="/" element={<Login />} />
       <Route path="/login" element={<Login />} />
       <Route path="/dashboard" element={<Dashboard />} />
+      <Route path="/renew" element={<Renew />} />
       <Route path="/profile" element={<Profile />} />
-      <Route path="/admin" element={<AdminPreview />} />
+      <Route path="/admin" element={<AdminDashboard />} />
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );
