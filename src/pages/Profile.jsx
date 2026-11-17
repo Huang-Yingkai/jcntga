@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
+const COMMON_LANGUAGE_OPTIONS = ['English', 'Bahasa Melayu', 'Mandarin', 'Cantonese', 'Tamil', 'Japanese', 'Korean'];
+
 const SAMPLE_PROFILE = {
   id: 'demo-user-id',
   full_name: 'Alicia Tan',
@@ -15,6 +17,62 @@ const SAMPLE_PROFILE = {
   membership_expiry: '2027-12-31',
   role: 'member',
 };
+
+function normalizeLanguageValue(value) {
+  if (!value) return '';
+  const normalized = value.trim().toLowerCase();
+  const aliases = {
+    'bahasa malaysia': 'bahasa melayu',
+    'bahasa melayu': 'bahasa melayu',
+    'malay': 'bahasa melayu',
+  };
+
+  return aliases[normalized] || normalized;
+}
+
+function splitOtherLanguages(value) {
+  return String(value ?? '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function getLanguageSelections(languages) {
+  const values = Array.isArray(languages) ? languages : typeof languages === 'string' ? languages.split(',') : [];
+  const selected = [];
+  const other = [];
+
+  values.forEach((entry) => {
+    const value = String(entry || '').trim();
+    if (!value) return;
+
+    const selectedLanguage = COMMON_LANGUAGE_OPTIONS.find(
+      (language) => normalizeLanguageValue(language) === normalizeLanguageValue(value)
+    );
+
+    if (selectedLanguage) {
+      selected.push(selectedLanguage);
+      return;
+    }
+
+    other.push(value);
+  });
+
+  const uniqueSelected = [...new Set(selected)];
+  const uniqueOther = [...new Set(other)];
+
+  return {
+    selected: uniqueSelected,
+    other: uniqueOther.join(', '),
+  };
+}
+
+function buildLanguagesArray(selectedLanguages, otherLanguagesString) {
+  const selected = Array.isArray(selectedLanguages) ? selectedLanguages : [];
+  const other = splitOtherLanguages(otherLanguagesString);
+
+  return [...new Set([...selected, ...other].map((item) => item.trim()).filter(Boolean))];
+}
 
 function formatDate(value) {
   if (!value) return 'Not set';
@@ -37,6 +95,7 @@ function formatLanguages(value) {
 export default function Profile() {
   const navigate = useNavigate();
   const [profile, setProfile] = useState(SAMPLE_PROFILE);
+  const [otherLanguages, setOtherLanguages] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -51,11 +110,16 @@ export default function Profile() {
         const currentProfile = await getCurrentProfile();
 
         if (isMounted) {
-          setProfile(currentProfile ?? SAMPLE_PROFILE);
+          const profileData = currentProfile ?? SAMPLE_PROFILE;
+          const { selected, other } = getLanguageSelections(profileData.languages);
+          setProfile({ ...profileData, languages: selected });
+          setOtherLanguages(other);
         }
       } catch (err) {
         if (isMounted) {
-          setProfile(SAMPLE_PROFILE);
+          const { selected, other } = getLanguageSelections(SAMPLE_PROFILE.languages);
+          setProfile({ ...SAMPLE_PROFILE, languages: selected });
+          setOtherLanguages(other);
         }
       } finally {
         if (isMounted) {
@@ -76,8 +140,28 @@ export default function Profile() {
 
     setProfile((current) => ({
       ...current,
-      [name]: name === 'languages' ? value.split(',').map((item) => item.trim()).filter(Boolean) : value,
+      [name]: value,
     }));
+    setSuccess('');
+    setError('');
+  };
+
+  const handleLanguageToggle = (language) => {
+    setProfile((current) => {
+      const currentLanguages = Array.isArray(current.languages) ? current.languages : [];
+      const hasLanguage = currentLanguages.some(
+        (item) => normalizeLanguageValue(item) === normalizeLanguageValue(language)
+      );
+
+      const nextLanguages = hasLanguage
+        ? currentLanguages.filter((item) => normalizeLanguageValue(item) !== normalizeLanguageValue(language))
+        : [...currentLanguages, language];
+
+      return {
+        ...current,
+        languages: nextLanguages,
+      };
+    });
     setSuccess('');
     setError('');
   };
@@ -113,7 +197,7 @@ export default function Profile() {
         full_name: profile.full_name,
         ic_number: profile.ic_number,
         phone: profile.phone,
-        languages: Array.isArray(profile.languages) ? profile.languages : String(profile.languages || '').split(',').map((item) => item.trim()).filter(Boolean),
+        languages: buildLanguagesArray(profile.languages, otherLanguages),
         emergency_contact_name: profile.emergency_contact_name,
         emergency_contact_phone: profile.emergency_contact_phone,
         home_address: profile.home_address,
@@ -207,11 +291,42 @@ export default function Profile() {
 
               <div>
                 <label className="mb-2 block text-sm font-semibold text-slate-900">Languages</label>
+                <div className="grid grid-cols-2 gap-3">
+                  {COMMON_LANGUAGE_OPTIONS.map((language) => {
+                    const checked = (profile.languages || []).some(
+                      (item) => normalizeLanguageValue(item) === normalizeLanguageValue(language)
+                    );
+
+                    return (
+                      <label
+                        key={language}
+                        className={[
+                          'flex min-h-[44px] cursor-pointer items-center gap-2 rounded-xl border px-3 text-sm font-semibold transition-colors',
+                          checked
+                            ? 'border-slate-900 bg-slate-900 text-white shadow-sm'
+                            : 'border-slate-300 bg-slate-50 text-slate-900 hover:border-slate-500',
+                        ].join(' ')}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => handleLanguageToggle(language)}
+                          className="h-4 w-4 accent-slate-900"
+                        />
+                        <span>{language}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-slate-900">Other languages (comma-separated)</label>
                 <input
-                  name="languages"
-                  value={formatLanguages(profile.languages)}
-                  onChange={handleChange}
-                  placeholder="English, Bahasa Malaysia"
+                  type="text"
+                  value={otherLanguages}
+                  onChange={(event) => setOtherLanguages(event.target.value)}
+                  placeholder="French, German, Arabic"
                   className="min-h-[48px] w-full rounded-xl border border-slate-300 bg-slate-50 px-3 text-base text-slate-900 outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-200"
                 />
               </div>
