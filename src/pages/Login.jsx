@@ -49,10 +49,6 @@ export default function Login() {
     }
   };
 
-  const handlePreview = () => {
-    navigate('/dashboard');
-  };
-
   return (
     <main className="min-h-screen bg-[#f3efe7] px-4 py-8 text-slate-900 md:flex md:items-center md:justify-center">
       <div className="mx-auto w-full max-w-md rounded-[28px] border border-slate-300 bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,0.12)] md:p-7">
@@ -110,15 +106,6 @@ export default function Login() {
           </button>
         </form>
 
-        <div className="mt-5 border-t border-slate-200 pt-4">
-          <button
-            type="button"
-            onClick={handlePreview}
-            className="min-h-[48px] w-full rounded-xl border border-amber-600 bg-amber-100 px-4 py-3 text-base font-semibold text-amber-900 transition hover:bg-amber-200"
-          >
-            Preview UI (Demo Mode)
-          </button>
-        </div>
       </div>
     </main>
   );

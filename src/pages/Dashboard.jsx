@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 const SAMPLE_PROFILE = {
   full_name: 'Alicia Tan',
@@ -27,6 +27,7 @@ function formatStatus(value) {
 }
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const [profile, setProfile] = useState(SAMPLE_PROFILE);
   const [loading, setLoading] = useState(true);
 
@@ -70,16 +71,35 @@ export default function Dashboard() {
     return 'bg-slate-200 text-slate-800 border-slate-300';
   }, [profile.membership_status]);
 
+  const handleSignOut = async () => {
+    try {
+      const { supabase } = await import('../lib/supabase.js');
+      await supabase.auth.signOut();
+      navigate('/login', { replace: true });
+    } catch (error) {
+      console.error('Sign out failed:', error);
+    }
+  };
+
   return (
     <main className="min-h-screen bg-[#f6f1e8] pb-24 text-slate-900">
       <div className="mx-auto max-w-md px-4 pb-8 pt-6">
-        <header className="mb-5 flex items-center justify-between">
+        <header className="mb-5 flex items-center justify-between gap-3">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.22em] text-amber-700">JCNTGA</p>
             <h1 className="mt-2 text-2xl font-extrabold text-slate-900">Dashboard</h1>
           </div>
-          <div className="rounded-full border-2 border-blue-800 bg-blue-100 px-3 py-2 text-xs font-bold uppercase tracking-[0.12em] text-blue-900">
-            {loading ? 'Loading' : formatStatus(profile.membership_status)}
+          <div className="flex items-center gap-2">
+            <div className="rounded-full border-2 border-blue-800 bg-blue-100 px-3 py-2 text-xs font-bold uppercase tracking-[0.12em] text-blue-900">
+              {loading ? 'Loading' : formatStatus(profile.membership_status)}
+            </div>
+            <button
+              type="button"
+              onClick={handleSignOut}
+              className="min-h-[44px] rounded-xl border-2 border-slate-700 bg-slate-900 px-3 py-2 text-xs font-bold uppercase tracking-[0.12em] text-white"
+            >
+              Sign Out
+            </button>
           </div>
         </header>
 

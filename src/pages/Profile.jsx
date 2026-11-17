@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 const SAMPLE_PROFILE = {
   id: 'demo-user-id',
@@ -35,6 +35,7 @@ function formatLanguages(value) {
 }
 
 export default function Profile() {
+  const navigate = useNavigate();
   const [profile, setProfile] = useState(SAMPLE_PROFILE);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -79,6 +80,16 @@ export default function Profile() {
     }));
     setSuccess('');
     setError('');
+  };
+
+  const handleSignOut = async () => {
+    try {
+      const { supabase } = await import('../lib/supabase.js');
+      await supabase.auth.signOut();
+      navigate('/login', { replace: true });
+    } catch (err) {
+      console.error('Sign out failed:', err);
+    }
   };
 
   const handleSubmit = async (event) => {
@@ -128,9 +139,18 @@ export default function Profile() {
   return (
     <main className="min-h-screen bg-[#f8f3ea] pb-24 text-slate-900">
       <div className="mx-auto max-w-md px-4 pb-10 pt-6">
-        <header className="mb-5">
-          <p className="text-xs font-bold uppercase tracking-[0.22em] text-amber-700">JCNTGA</p>
-          <h1 className="mt-2 text-2xl font-extrabold text-slate-900">Profile</h1>
+        <header className="mb-5 flex items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.22em] text-amber-700">JCNTGA</p>
+            <h1 className="mt-2 text-2xl font-extrabold text-slate-900">Profile</h1>
+          </div>
+          <button
+            type="button"
+            onClick={handleSignOut}
+            className="min-h-[44px] rounded-xl border-2 border-slate-700 bg-slate-900 px-3 py-2 text-xs font-bold uppercase tracking-[0.12em] text-white"
+          >
+            Sign Out
+          </button>
         </header>
 
         <form onSubmit={handleSubmit} className="space-y-4">
