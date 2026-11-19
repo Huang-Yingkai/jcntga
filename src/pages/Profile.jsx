@@ -6,20 +6,9 @@ const COMMON_LANGUAGE_OPTIONS = ['English', 'Bahasa Melayu', 'Mandarin', 'Canton
                                   'Arabic', 'French', 'German', 'Spanish', 'Italian', 'Portuguese', 'Russian',
                                   'Dutch', 'Turkish', 'Filipino'];
 
-const SAMPLE_PROFILE = {
-  id: 'demo-user-id',
-  full_name: 'Alicia Tan',
-  email: 'alicia@jcntga.dev',
-  ic_number: '970101-10-1234',
-  phone: '+6012-3456789',
-  languages: ['English', 'Bahasa Malaysia'],
-  emergency_contact_name: 'Rahman Tan',
-  emergency_contact_phone: '+6013-7654321',
-  home_address: 'No. 12, Jalan Bukit Indah, Johor Bahru, Johor',
-  membership_status: 'active',
-  membership_expiry: '2027-12-31',
-  role: 'member',
-};
+const EMPTY_PROFILE = { languages: [] };
+
+const PROFILE_LOAD_ERROR = 'Unable to load your profile. Please refresh the page or sign in again.';
 
 function normalizeLanguageValue(value) {
   if (!value) return '';
@@ -38,6 +27,17 @@ function splitOtherLanguages(value) {
     .split(',')
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+// Case-insensitive de-duplication that keeps the first spelling seen.
+function dedupeLanguages(values) {
+  const seen = new Set();
+  return values.filter((value) => {
+    const key = normalizeLanguageValue(value);
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function getLanguageSelections(languages) {
@@ -61,8 +61,8 @@ function getLanguageSelections(languages) {
     other.push(value);
   });
 
-  const uniqueSelected = [...new Set(selected)];
-  const uniqueOther = [...new Set(other)];
+  const uniqueSelected = dedupeLanguages(selected);
+  const uniqueOther = dedupeLanguages(other);
 
   return {
     selected: uniqueSelected,
@@ -74,7 +74,7 @@ function buildLanguagesArray(selectedLanguages, otherLanguagesString) {
   const selected = Array.isArray(selectedLanguages) ? selectedLanguages : [];
   const other = splitOtherLanguages(otherLanguagesString);
 
-  return [...new Set([...selected, ...other].map((item) => item.trim()).filter(Boolean))];
+  return dedupeLanguages([...selected, ...other].map((item) => String(item ?? '').trim()).filter(Boolean));
 }
 
 function formatDate(value) {
@@ -97,7 +97,8 @@ function formatLanguages(value) {
 
 export default function Profile() {
   const navigate = useNavigate();
-  const [profile, setProfile] = useState(SAMPLE_PROFILE);
+  const [profile, setProfile] = useState(EMPTY_PROFILE);
+  const [loadError, setLoadError] = useState('');
   const [otherLanguages, setOtherLanguages] = useState('');
   const [newOtherLanguage, setNewOtherLanguage] = useState('');
   const [loading, setLoading] = useState(true);
@@ -113,17 +114,26 @@ export default function Profile() {
         const { getCurrentProfile } = await import('../lib/supabase.js');
         const currentProfile = await getCurrentProfile();
 
-        if (isMounted) {
-          const profileData = currentProfile ?? SAMPLE_PROFILE;
-          const { selected, other } = getLanguageSelections(profileData.languages);
-          setProfile({ ...profileData, languages: selected });
-          setOtherLanguages(other);
+        if (!isMounted) return;
+
+        if (!currentProfile) {
+          // Never fall back to placeholder data: keep the form empty and saving blocked.
+          setProfile(EMPTY_PROFILE);
+          setOtherLanguages('');
+          setLoadError(PROFILE_LOAD_ERROR);
+          return;
         }
+
+        const { selected, other } = getLanguageSelections(currentProfile.languages);
+        setProfile({ ...currentProfile, languages: selected });
+        setOtherLanguages(other);
+        setLoadError('');
       } catch (err) {
+        console.error('Profile load failed:', err);
         if (isMounted) {
-          const { selected, other } = getLanguageSelections(SAMPLE_PROFILE.languages);
-          setProfile({ ...SAMPLE_PROFILE, languages: selected });
-          setOtherLanguages(other);
+          setProfile(EMPTY_PROFILE);
+          setOtherLanguages('');
+          setLoadError(PROFILE_LOAD_ERROR);
         }
       } finally {
         if (isMounted) {
@@ -171,36 +181,53 @@ export default function Profile() {
   };
 
     const addOtherLanguage = () => {
-  const value = newOtherLanguage.trim();
-  if (!value) return;
+  const values = splitOtherLanguages(newOtherLanguage);
+  if (values.length === 0) return;
 
-  const key = normalizeLanguageValue(value);
+  const selectedKeys = new Set((profile.languages || []).map(normalizeLanguageValue));
+  const otherList = splitOtherLanguages(otherLanguages);
+  const otherKeys = new Set(otherList.map(normalizeLanguageValue));
+  const commonToSelect = [];
+  const duplicates = [];
 
-  // If it matches a language in the dropdown, just select it there
-  const commonMatch = COMMON_LANGUAGE_OPTIONS.find(
-    (language) => normalizeLanguageValue(language) === key
-  );
-  if (commonMatch) {
-    const alreadySelected = (profile.languages || []).some(
-      (item) => normalizeLanguageValue(item) === key
+  values.forEach((value) => {
+    const key = normalizeLanguageValue(value);
+
+    // If it matches a language in the dropdown, select it there instead of adding a custom chip
+    const commonMatch = COMMON_LANGUAGE_OPTIONS.find(
+      (language) => normalizeLanguageValue(language) === key
     );
-    if (!alreadySelected) handleLanguageToggle(commonMatch);
-    setNewOtherLanguage('');
-    return;
-  }
+    if (commonMatch) {
+      if (!selectedKeys.has(key)) {
+        selectedKeys.add(key);
+        commonToSelect.push(commonMatch);
+      }
+      return;
+    }
 
-  const alreadyOther = splitOtherLanguages(otherLanguages).some(
-    (item) => normalizeLanguageValue(item) === key
-  );
-  if (alreadyOther) {
-    setError(`"${value}" is already added.`);
-    return;
-  }
+    if (otherKeys.has(key)) {
+      duplicates.push(value);
+      return;
+    }
 
-  setOtherLanguages([...splitOtherLanguages(otherLanguages), value].join(', '));
+    otherKeys.add(key);
+    otherList.push(value);
+  });
+
+  if (commonToSelect.length > 0) {
+    setProfile((current) => ({
+      ...current,
+      languages: dedupeLanguages([...(current.languages || []), ...commonToSelect]),
+    }));
+  }
+  setOtherLanguages(otherList.join(', '));
   setNewOtherLanguage('');
-  setError('');
   setSuccess('');
+  setError(
+    duplicates.length > 0
+      ? `${duplicates.map((item) => `"${item}"`).join(', ')} ${duplicates.length === 1 ? 'is' : 'are'} already added.`
+      : ''
+  );
 };
 
 const removeOtherLanguage = (language) => {
@@ -223,6 +250,11 @@ const removeOtherLanguage = (language) => {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    if (loadError || !profile.id) {
+      setError(PROFILE_LOAD_ERROR);
+      return;
+    }
+
     setSaving(true);
     setError('');
     setSuccess('');
@@ -231,11 +263,8 @@ const removeOtherLanguage = (language) => {
       const { supabase } = await import('../lib/supabase.js');
 
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        setProfile((current) => ({ ...current, ...profile }));
-        setSuccess('Demo profile updated locally.');
-        setSaving(false);
-        return;
+      if (!user || user.id !== profile.id) {
+        throw new Error('Your session has changed. Please sign in again.');
       }
 
       const payload = {
@@ -461,6 +490,10 @@ const removeOtherLanguage = (language) => {
             </div>
           </div>
 
+          {loadError ? (
+            <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">{loadError}</div>
+          ) : null}
+
           {error ? (
             <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">{error}</div>
           ) : null}
@@ -471,7 +504,7 @@ const removeOtherLanguage = (language) => {
 
           <button
             type="submit"
-            disabled={saving || loading}
+            disabled={saving || loading || Boolean(loadError) || !profile.id}
             className="flex min-h-[52px] w-full items-center justify-center rounded-2xl border-2 border-blue-800 bg-blue-100 px-4 py-3 text-base font-bold text-blue-900 transition hover:bg-blue-200 disabled:cursor-not-allowed disabled:opacity-70"
           >
             {saving ? 'Saving...' : 'Save Profile'}
