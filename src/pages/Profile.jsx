@@ -319,7 +319,7 @@ const removeOtherLanguage = (language) => {
                 <h2 className="mt-1 text-xl font-bold text-slate-900">{profile.full_name || 'Tourist Guide'}</h2>
               </div>
               <span className="rounded-full border border-emerald-300 bg-emerald-100 px-3 py-1 text-xs font-bold uppercase tracking-[0.08em] text-emerald-900">
-                {profile.membership_status || 'active'}
+                {profile.membership_status || 'Unknown'}
               </span>
             </div>
 
@@ -481,7 +481,7 @@ const removeOtherLanguage = (language) => {
             <div className="grid grid-cols-2 gap-3">
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                 <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">Status</p>
-                <p className="mt-2 text-sm font-bold uppercase text-slate-900">{profile.membership_status || 'active'}</p>
+                <p className="mt-2 text-sm font-bold uppercase text-slate-900">{profile.membership_status || 'Unknown'}</p>
               </div>
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                 <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">Expiry</p>

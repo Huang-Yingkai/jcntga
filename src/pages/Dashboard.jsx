@@ -1,12 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
-const SAMPLE_PROFILE = {
-  full_name: 'Alicia Tan',
-  membership_status: 'active',
-  membership_expiry: '2027-12-31',
-  role: 'member',
-};
+const PROFILE_LOAD_ERROR = 'Unable to load your profile. Please refresh the page or sign in again.';
 
 function formatDate(value) {
   if (!value) return 'Not set';
@@ -28,7 +23,8 @@ function formatStatus(value) {
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const [profile, setProfile] = useState(SAMPLE_PROFILE);
+  const [profile, setProfile] = useState({});
+  const [loadError, setLoadError] = useState('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -39,12 +35,22 @@ export default function Dashboard() {
         const { getCurrentProfile } = await import('../lib/supabase.js');
         const currentProfile = await getCurrentProfile();
 
-        if (isMounted) {
-          setProfile(currentProfile ?? SAMPLE_PROFILE);
+        if (!isMounted) return;
+
+        if (!currentProfile) {
+          // Never fall back to placeholder data.
+          setProfile({});
+          setLoadError(PROFILE_LOAD_ERROR);
+          return;
         }
+
+        setProfile(currentProfile);
+        setLoadError('');
       } catch (error) {
+        console.error('Profile load failed:', error);
         if (isMounted) {
-          setProfile(SAMPLE_PROFILE);
+          setProfile({});
+          setLoadError(PROFILE_LOAD_ERROR);
         }
       } finally {
         if (isMounted) {
@@ -61,7 +67,7 @@ export default function Dashboard() {
   }, []);
 
   const statusClasses = useMemo(() => {
-    const status = (profile.membership_status || 'active').toLowerCase();
+    const status = (profile.membership_status || '').toLowerCase();
     if (status === 'active') {
       return 'bg-emerald-100 text-emerald-900 border-emerald-300';
     }
@@ -102,6 +108,10 @@ export default function Dashboard() {
             </button>
           </div>
         </header>
+
+        {loadError ? (
+          <div role="alert" className="mb-5 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">{loadError}</div>
+        ) : null}
 
         <section className="overflow-hidden rounded-[28px] border border-slate-300 bg-gradient-to-br from-slate-900 via-slate-800 to-amber-900 text-white shadow-[0_18px_42px_rgba(15,23,42,0.2)]">
           <div className="border-b border-white/20 p-5">
