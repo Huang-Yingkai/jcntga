@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
-const COMMON_LANGUAGE_OPTIONS = ['English', 'Bahasa Melayu', 'Mandarin', 'Cantonese', 'Tamil', 'Japanese', 'Korean'];
+const COMMON_LANGUAGE_OPTIONS = ['English', 'Bahasa Melayu', 'Mandarin', 'Cantonese', 'Hokkien', 'Hakka', 'Teochew',
+                                  'Tamil', 'Hindi', 'Japanese', 'Korean', 'Thai', 'Vietnamese', 'Indonesian',
+                                  'Arabic', 'French', 'German', 'Spanish', 'Italian', 'Portuguese', 'Russian',
+                                  'Dutch', 'Turkish', 'Filipino'];
 
 const SAMPLE_PROFILE = {
   id: 'demo-user-id',
@@ -96,6 +99,7 @@ export default function Profile() {
   const navigate = useNavigate();
   const [profile, setProfile] = useState(SAMPLE_PROFILE);
   const [otherLanguages, setOtherLanguages] = useState('');
+  const [newOtherLanguage, setNewOtherLanguage] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -165,6 +169,47 @@ export default function Profile() {
     setSuccess('');
     setError('');
   };
+
+    const addOtherLanguage = () => {
+  const value = newOtherLanguage.trim();
+  if (!value) return;
+
+  const key = normalizeLanguageValue(value);
+
+  // If it matches a language in the dropdown, just select it there
+  const commonMatch = COMMON_LANGUAGE_OPTIONS.find(
+    (language) => normalizeLanguageValue(language) === key
+  );
+  if (commonMatch) {
+    const alreadySelected = (profile.languages || []).some(
+      (item) => normalizeLanguageValue(item) === key
+    );
+    if (!alreadySelected) handleLanguageToggle(commonMatch);
+    setNewOtherLanguage('');
+    return;
+  }
+
+  const alreadyOther = splitOtherLanguages(otherLanguages).some(
+    (item) => normalizeLanguageValue(item) === key
+  );
+  if (alreadyOther) {
+    setError(`"${value}" is already added.`);
+    return;
+  }
+
+  setOtherLanguages([...splitOtherLanguages(otherLanguages), value].join(', '));
+  setNewOtherLanguage('');
+  setError('');
+  setSuccess('');
+};
+
+const removeOtherLanguage = (language) => {
+  setOtherLanguages(
+    splitOtherLanguages(otherLanguages).filter((item) => item !== language).join(', ')
+  );
+  setSuccess('');
+};
+  
 
   const handleSignOut = async () => {
     try {
@@ -290,45 +335,84 @@ export default function Profile() {
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-semibold text-slate-900">Languages</label>
-                <div className="grid grid-cols-2 gap-3">
-                  {COMMON_LANGUAGE_OPTIONS.map((language) => {
-                    const checked = (profile.languages || []).some(
-                      (item) => normalizeLanguageValue(item) === normalizeLanguageValue(language)
-                    );
+              <label className="mb-2 block text-sm font-semibold text-slate-900">Languages</label>
+              <select
+                value=""
+                onChange={(event) => {
+                if (event.target.value) handleLanguageToggle(event.target.value);
+                }}
+                className="min-h-[48px] w-full rounded-xl border border-slate-300 bg-slate-50 px-3 text-base text-slate-900 outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-200"
+              >
+              <option value="">Select a language...</option>
+                {COMMON_LANGUAGE_OPTIONS.filter(
+                (language) =>
+                  !(profile.languages || []).some(
+                  (item) => normalizeLanguageValue(item) === normalizeLanguageValue(language)
+                  )).map((language) => (
+              <option key={language} value={language}>
+              {language}
+              </option>
+              ))}
+              </select>
 
-                    return (
-                      <label
-                        key={language}
-                        className={[
-                          'flex min-h-[44px] cursor-pointer items-center gap-2 rounded-xl border px-3 text-sm font-semibold transition-colors',
-                          checked
-                            ? 'border-slate-900 bg-slate-900 text-white shadow-sm'
-                            : 'border-slate-300 bg-slate-50 text-slate-900 hover:border-slate-500',
-                        ].join(' ')}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => handleLanguageToggle(language)}
-                          className="h-4 w-4 accent-slate-900"
-                        />
-                        <span>{language}</span>
-                      </label>
-                    );
-                  })}
-                </div>
+            <div className="mt-3 flex gap-2">
+              <input
+              type="text"
+              value={newOtherLanguage}
+              onChange={(event) => setNewOtherLanguage(event.target.value)}
+              onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                addOtherLanguage();
+              }
+            }}
+            placeholder="Not in the list? Type it here"
+            className="min-h-[48px] w-full rounded-xl border border-slate-300 bg-slate-50 px-3 text-base text-slate-900 outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-200"
+            />
+            <button
+            type="button"
+            onClick={addOtherLanguage}
+            className="min-h-[48px] rounded-xl border-2 border-slate-700 bg-slate-900 px-4 text-sm font-bold text-white"
+            >
+            Add
+            </button>
+            </div>
+
+            <div className="mt-3 flex flex-wrap gap-2">
+            {(profile.languages || []).map((language) => (
+            <span
+            key={language}
+            className="flex items-center gap-2 rounded-full border border-slate-900 bg-slate-900 px-3 py-1 text-sm font-semibold text-white"
+            >
+            {language}
+            <button
+              type="button"
+              onClick={() => handleLanguageToggle(language)}
+              aria-label={`Remove ${language}`}
+              className="text-base leading-none"
+            >
+            ×
+            </button>
+            </span>
+            ))}
+
+          {splitOtherLanguages(otherLanguages).map((language) => (
+          <span
+          key={language}
+          className="flex items-center gap-2 rounded-full border border-slate-900 bg-slate-900 px-3 py-1 text-sm font-semibold text-white"
+          >
+          {language}
+          <button
+          type="button"
+          onClick={() => removeOtherLanguage(language)}
+          aria-label={`Remove ${language}`}
+          className="text-base leading-none"
+        >
+          ×
+          </button>
+              </span>
+              ))}
               </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-slate-900">Other languages (comma-separated)</label>
-                <input
-                  type="text"
-                  value={otherLanguages}
-                  onChange={(event) => setOtherLanguages(event.target.value)}
-                  placeholder="French, German, Arabic"
-                  className="min-h-[48px] w-full rounded-xl border border-slate-300 bg-slate-50 px-3 text-base text-slate-900 outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-200"
-                />
               </div>
 
               <div>
