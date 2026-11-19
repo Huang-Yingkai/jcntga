@@ -1,0 +1,90 @@
+// src/lib/renewals.js
+// AP-4: Prevent duplicate pending renewal submissions (frontend part).
+import { supabase, proofPath, PROOF_BUCKET } from './supabase';
+
+// Returns true if this member already has a renewal waiting for review.
+export async function hasPendingRenewal(memberId) {
+  const { count, error } = await supabase
+    .from('renewals')
+    .select('id', { count: 'exact', head: true })
+    .eq('member_id', memberId)
+    .eq('status', 'pending');
+
+  if (error) throw error;
+  return count > 0;
+}
+
+// Submit a renewal safely.
+// Order matters: check first, THEN upload, so we don't upload a file
+// that can never be used (members cannot delete uploaded proofs).
+export async function submitRenewal(memberId, years, file) {
+  // 1. Block early if a pending renewal already exists
+  if (await hasPendingRenewal(memberId)) {
+    throw new Error(
+      'You already have a renewal waiting for approval. ' +
+      'Please wait for the Secretary to review it before submitting another.'
+    );
+  }
+
+  // 2. Upload the payment proof into the member's own folder
+  const path = proofPath(memberId, file.name);
+  const { error: uploadError } = await supabase.storage
+    .from(PROOF_BUCKET)
+    .upload(path, file);
+  if (uploadError) throw uploadError;
+
+  // 3. Create the renewal record
+  const { data, error: insertError } = await supabase
+    .from('renewals')
+    .insert({ member_id: memberId, years, proof_path: path })
+    .select()
+    .single();
+
+  if (insertError) {
+    // 23505 = unique violation from the database rule (e.g. double-click)
+    if (insertError.code === '23505') {
+      throw new Error('You already have a renewal waiting for approval.');
+    }
+    throw insertError;
+  }
+
+  return data;
+}
+
+/* ---------------------------------------------------------------
+   Example use in a React renewal page (adapt to your existing page):
+
+   import { useEffect, useState } from 'react';
+   import { hasPendingRenewal, submitRenewal } from '../lib/renewals';
+
+   const [pending, setPending] = useState(false);
+   const [submitting, setSubmitting] = useState(false);
+   const [message, setMessage] = useState('');
+
+   useEffect(() => {
+     hasPendingRenewal(profile.id).then(setPending);
+   }, [profile.id]);
+
+   async function handleSubmit(e) {
+     e.preventDefault();
+     if (submitting) return;          // stops double-clicks
+     setSubmitting(true);
+     setMessage('');
+     try {
+       await submitRenewal(profile.id, years, file);
+       setPending(true);
+       setMessage('Renewal submitted. Waiting for approval.');
+     } catch (err) {
+       setMessage(err.message);
+     } finally {
+       setSubmitting(false);
+     }
+   }
+
+   // In the JSX:
+   {pending && <p>You have a renewal waiting for approval.</p>}
+   <button type="submit" disabled={pending || submitting}>
+     {submitting ? 'Submitting…' : 'Submit renewal'}
+   </button>
+   {message && <p>{message}</p>}
+---------------------------------------------------------------- */

@@ -1,0 +1,19 @@
+-- 006_prevent_duplicate_pending.sql
+-- AP-4: Prevent duplicate pending renewal submissions.
+-- Rule: a member can have at most ONE renewal with status = 'pending'.
+-- After it is approved or rejected, they can submit a new one.
+
+-- STEP 1 (run first): check whether duplicates already exist.
+-- If this returns any rows, ask Yingkai how to clean them up
+-- (e.g. reject the extra ones) before running STEP 2, otherwise STEP 2 fails.
+select member_id, count(*) as pending_count
+from public.renewals
+where status = 'pending'
+group by member_id
+having count(*) > 1;
+
+-- STEP 2: the database itself refuses a second pending renewal
+-- for the same member, even if someone double-clicks or bypasses the UI.
+create unique index if not exists renewals_one_pending_per_member
+  on public.renewals (member_id)
+  where status = 'pending';
