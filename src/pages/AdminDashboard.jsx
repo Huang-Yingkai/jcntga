@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PROOF_BUCKET, getCurrentProfile, supabase } from '../lib/supabase.js';
+import AdminCourses from './AdminCourses';
 
-const TAB_OPTIONS = ['Pending Renewals', 'Member Directory'];
+const TAB_OPTIONS = ['Pending Renewals', 'Member Directory', 'Courses'];
 const STATUS_OPTIONS = ['All', 'active', 'expired', 'pending'];
 
 function formatDate(value) {
@@ -287,15 +288,16 @@ export default function AdminDashboard() {
           </div>
         ) : null}
 
-        <div className="mb-6 grid w-full gap-3 rounded-2xl border border-slate-300 bg-white p-3 shadow-sm md:grid-cols-2">
+        <div className="mb-6 grid w-full gap-3 rounded-2xl border border-slate-300 bg-white p-3 shadow-sm md:grid-cols-3">
           {TAB_OPTIONS.map((tab) => {
             const isActive = activeTab === tab;
-            const tabCount = tab === 'Pending Renewals' ? pendingCount : members.length;
+            const tabCount = { 'Pending Renewals': pendingCount, 'Member Directory': members.length }[tab];
 
             return (
               <button
                 key={tab}
                 type="button"
+                aria-pressed={isActive}
                 onClick={() => setActiveTab(tab)}
                 className={[
                   'min-h-[52px] rounded-xl border-2 px-4 py-3 text-left font-bold transition',
@@ -306,14 +308,16 @@ export default function AdminDashboard() {
               >
                 <div className="flex items-center justify-between gap-3">
                   <span>{tab}</span>
-                  <span
-                    className={[
-                      'rounded-full px-2.5 py-1 text-xs font-black',
-                      isActive ? 'bg-white text-slate-900' : 'bg-slate-200 text-slate-800',
-                    ].join(' ')}
-                  >
-                    {tabCount}
-                  </span>
+                  {tabCount !== undefined && (
+                    <span
+                      className={[
+                        'rounded-full px-2.5 py-1 text-xs font-black',
+                        isActive ? 'bg-white text-slate-900' : 'bg-slate-200 text-slate-800',
+                      ].join(' ')}
+                    >
+                      {tabCount}
+                    </span>
+                  )}
                 </div>
               </button>
             );
@@ -332,7 +336,9 @@ export default function AdminDashboard() {
           </div>
         ) : null}
 
-        {activeTab === 'Pending Renewals' ? (
+        {activeTab === 'Courses' && profile?.role === 'admin' && <AdminCourses />}
+
+        {activeTab === 'Pending Renewals' && (
           <section className="rounded-2xl border border-slate-300 bg-white p-4 shadow-sm">
             {loadingRenewals ? (
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-6 text-center text-base font-semibold text-slate-700">
@@ -423,7 +429,9 @@ export default function AdminDashboard() {
               </div>
             )}
           </section>
-        ) : (
+        )}
+
+        {activeTab === 'Member Directory' && (
           <section className="rounded-2xl border border-slate-300 bg-white p-4 shadow-sm">
             <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <input

@@ -72,6 +72,24 @@ Please use these exact field names in forms and API calls.
 - `tests/run_local.sh` – runs the migrations and 27 RLS checks on a local PostgreSQL.
 - `tests/supabase_mock.sql` is for local testing only. **Do not run it on the real Supabase project.**
 
+## Sprint 2 course creation and booking
+
+Apply `007_courses_and_seat_capping.sql` after the base Supabase migrations. Sign in as the secretary and open **Admin → Courses** to create a course. Start times are entered in Malaysia time.
+
+Guest checkout can read `id`, `title`, `starts_at`, `seat_limit` and `booked_seats` from `courses`. Availability shown on the page is a snapshot. Submit the booking through the RPC so PostgreSQL enforces the limit:
+
+```js
+const { data: registrationId, error } = await supabase.rpc('book_course_seat', {
+  p_course_id: courseId,
+  p_registration_id: requestId,
+  p_guest_details: guestDetails,
+});
+```
+
+Generate `requestId` with `crypto.randomUUID()` once per submission and reuse it, with the same course and details, when retrying an uncertain result. `guestDetails` must contain five nonblank string fields. Checkout owns the field names and field-specific validation. Use `error.message` to distinguish `COURSE_FULL`, `COURSE_NOT_FOUND`, `INVALID_REGISTRATION` and `REGISTRATION_ID_CONFLICT`.
+
+`bash tests/run_local.sh` also checks course creation permissions, registration privacy, booking retries and two simultaneous attempts to book the last seat.
+
 ## Setting up a new Supabase project (only if we ever need to start over)
 
 1. supabase.com → New project (Region: Singapore).
